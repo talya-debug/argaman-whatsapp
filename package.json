@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "firebase": "^12.14.0",
     "firebase-admin": "^13.10.0",
     "node-cron": "^3.0.3",
     "pino": "^9.6.0",

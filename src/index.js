@@ -2,29 +2,25 @@
 // מאזין להודעות בקבוצה, יוצר משימות ב-Firestore ושולח תזכורות
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase/app');
+const { getFirestore, collection, addDoc, Timestamp } = require('firebase/firestore');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const http = require('http');
 const config = require('./config');
-const { initReminders } = require('./reminders');
 
-// אתחול Firebase Admin
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: config.FIREBASE_PROJECT_ID,
-  });
-  console.log('🔑 Firebase מאותחל עם מפתח סודי (שרת)');
-} else {
-  admin.initializeApp({
-    projectId: config.FIREBASE_PROJECT_ID,
-  });
-  console.log('🔑 Firebase מאותחל עם הרשאות מקומיות');
-}
-const db = admin.firestore();
+// אתחול Firebase Client SDK
+const firebaseApp = initializeApp({
+  apiKey: "AIzaSyDEVZMA7R6FLZBdkPg1GPVhv5AajwjWVb8",
+  authDomain: "argaman-f3921.firebaseapp.com",
+  projectId: "argaman-f3921",
+  storageBucket: "argaman-f3921.firebasestorage.app",
+  messagingSenderId: "1089830122540",
+  appId: "1:1089830122540:web:36a7ef49e3c90e8d8acd89"
+});
+const db = getFirestore(firebaseApp);
+console.log('🔑 Firebase מאותחל');
 
 // לוגר שקט
 const logger = pino({ level: 'silent' });
@@ -92,7 +88,6 @@ async function connectToWhatsApp() {
       console.log('✅ מחובר לוואטסאפ');
       isConnected = true;
       currentQR = '';
-      initReminders(sock, db);
     }
   });
 
@@ -121,7 +116,8 @@ async function connectToWhatsApp() {
 
       try {
         const title = text.substring(0, 100);
-        await db.collection('tasks').add({
+        const now = new Date().toISOString();
+        await addDoc(collection(db, 'tasks'), {
           title,
           description: text,
           status: 'חדש',
@@ -129,7 +125,8 @@ async function connectToWhatsApp() {
           source_type: 'whatsapp',
           sender_name: senderName,
           sender_phone: senderPhone,
-          created_at: admin.firestore.FieldValue.serverTimestamp(),
+          created_date: now,
+          createdAt: now,
           assigned_to: '',
         });
 
