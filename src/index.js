@@ -1,16 +1,16 @@
 // שרת בוט וואטסאפ - ארגמן
-// מאזין להודעות בקבוצה, יוצר משימות ב-Firestore ושולח תזכורות
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, addDoc, Timestamp } = require('firebase/firestore');
+const { getFirestore, collection, addDoc, doc, updateDoc } = require('firebase/firestore');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const http = require('http');
 const config = require('./config');
+const { initReminders } = require('./reminders');
 
-// אתחול Firebase Client SDK
+// אתחול Firebase
 const firebaseApp = initializeApp({
   apiKey: "AIzaSyDEVZMA7R6FLZBdkPg1GPVhv5AajwjWVb8",
   authDomain: "argaman-f3921.firebaseapp.com",
@@ -22,12 +22,36 @@ const firebaseApp = initializeApp({
 const db = getFirestore(firebaseApp);
 console.log('🔑 Firebase מאותחל');
 
-// לוגר שקט
 const logger = pino({ level: 'silent' });
 
-// מצב QR ו-חיבור
+// מצב חיבור
 let currentQR = '';
 let isConnected = false;
+
+// מעקב משימות פתוחות — { senderPhone: { taskId, lastMessageTime } }
+const openTasks = {};
+
+// מיפוי שם וואטסאפ ל-username
+function resolveUser(pushName) {
+  if (!pushName) return null;
+  for (const [name, user] of Object.entries(config.NAME_TO_USER)) {
+    if (pushName.includes(name)) return user;
+  }
+  return null;
+}
+
+// חילוץ @אחראי מטקסט
+function extractAssignee(text) {
+  const match = text.match(/@(\S+)/);
+  if (!match) return config.DEFAULT_ASSIGNEE;
+  const name = match[1];
+  return config.NAME_TO_USER[name] || config.DEFAULT_ASSIGNEE;
+}
+
+// הסרת @אחראי מטקסט
+function cleanTitle(text) {
+  return text.replace(/^משימה\s*/i, '').replace(/@\S+/g, '').trim();
+}
 
 // שרת HTTP להצגת QR
 const PORT = process.env.PORT || 3000;
@@ -44,50 +68,42 @@ http.createServer((req, res) => {
       <script>setTimeout(()=>location.reload(), 15000)</script>
     </body></html>`);
   } else {
-    res.end('<html dir="rtl"><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial;background:#1a1d2e;color:#94a3b8;"><h2>ממתין ל-QR...<br><script>setTimeout(()=>location.reload(), 3000)</script></h2></body></html>');
+    res.end('<html dir="rtl"><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial;background:#1a1d2e;color:#94a3b8;"><h2>ממתין...<script>setTimeout(()=>location.reload(),3000)</script></h2></body></html>');
   }
 }).listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 דף QR זמין בפורט ${PORT}`);
 });
 
-// התחברות לוואטסאפ
+// התחברות
 async function connectToWhatsApp() {
   const authDir = process.env.AUTH_DIR || './auth_info';
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
-
-  const sock = makeWASocket({
-    auth: state,
-    logger,
-    printQRInTerminal: false,
-  });
+  const sock = makeWASocket({ auth: state, logger, printQRInTerminal: false });
 
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
-
     if (qr) {
-      console.log('\n📱 סרוק את הקוד עם וואטסאפ:');
+      console.log('\n📱 סרוק את הקוד:');
       qrcode.generate(qr, { small: true });
       currentQR = await QRCode.toDataURL(qr, { width: 300, margin: 2 });
     }
-
     if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`❌ החיבור נסגר. קוד: ${statusCode}`);
+      const code = lastDisconnect?.error?.output?.statusCode;
+      console.log(`❌ חיבור נסגר. קוד: ${code}`);
       isConnected = false;
       currentQR = '';
-      if (shouldReconnect) {
-        console.log('🔄 מתחבר מחדש בעוד 5 שניות...');
+      if (code !== DisconnectReason.loggedOut) {
+        console.log('🔄 מתחבר מחדש...');
         setTimeout(() => connectToWhatsApp(), 5000);
       }
     }
-
     if (connection === 'open') {
       console.log('✅ מחובר לוואטסאפ');
       isConnected = true;
       currentQR = '';
+      initReminders(sock);
     }
   });
 
@@ -97,43 +113,92 @@ async function connectToWhatsApp() {
 
     for (const msg of messages) {
       if (msg.key.fromMe) continue;
-      const isGroup = msg.key.remoteJid?.endsWith('@g.us');
-      if (!isGroup) continue;
+      if (!msg.key.remoteJid?.endsWith('@g.us')) continue;
+      if (msg.key.remoteJid !== config.GROUP_ID) continue;
 
-      const groupId = msg.key.remoteJid;
-      const senderName = msg.pushName || 'לא ידוע';
       const senderPhone = msg.key.participant || '';
-      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+      const senderName = msg.pushName || 'לא ידוע';
+      const senderUser = resolveUser(senderName) || senderName;
 
-      if (!text) continue;
-      console.log(`📩 [${groupId}] ${senderName}: ${text.substring(0, 80)}`);
+      // חילוץ טקסט
+      const text = msg.message?.conversation
+        || msg.message?.extendedTextMessage?.text
+        || '';
 
-      if (!config.GROUP_ID) {
-        console.log(`ℹ️ GROUP_ID לא מוגדר. מזהה קבוצה זו: ${groupId}`);
-        continue;
+      // זיהוי תמונות/קבצים
+      const hasImage = !!msg.message?.imageMessage;
+      const hasDocument = !!msg.message?.documentMessage;
+      const hasAudio = !!msg.message?.audioMessage;
+      const hasVideo = !!msg.message?.videoMessage;
+      const mediaType = hasImage ? 'תמונה' : hasDocument ? 'קובץ' : hasAudio ? 'הודעה קולית' : hasVideo ? 'סרטון' : null;
+
+      const now = Date.now();
+
+      console.log(`📩 ${senderName}: ${text ? text.substring(0, 60) : (mediaType || '?')}`);
+
+      // בדיקה אם יש משימה פתוחה לשולח הזה
+      const openTask = openTasks[senderPhone];
+      if (openTask && (now - openTask.lastMessageTime) < config.TASK_WINDOW_MS) {
+        // הודעה שמתחילה ב"משימה" → סוגר קודמת ופותח חדשה
+        if (text && text.match(/^משימה\s/i)) {
+          // פותח משימה חדשה (ממשיך למטה)
+        } else {
+          // מצרף למשימה הפתוחה
+          try {
+            const addition = mediaType ? `\n📎 ${mediaType} צורף` : (text ? `\n${text}` : '');
+            if (addition) {
+              const taskRef = doc(db, 'tasks', openTask.taskId);
+              await updateDoc(taskRef, {
+                description: openTask.description + addition,
+                updated_date: new Date().toISOString(),
+              });
+              openTask.description += addition;
+              openTask.lastMessageTime = now;
+              console.log(`📎 צורף למשימה: ${openTask.taskId}`);
+            }
+          } catch (e) {
+            console.error('❌ שגיאה בצירוף למשימה:', e.message);
+          }
+          continue;
+        }
       }
-      if (groupId !== config.GROUP_ID) continue;
 
+      // בדיקה אם זו משימה חדשה
+      if (!text || !text.match(/^משימה\s/i)) continue;
+
+      // יצירת משימה חדשה
       try {
-        const title = text.substring(0, 100);
-        const now = new Date().toISOString();
-        await addDoc(collection(db, 'tasks'), {
+        const assignee = extractAssignee(text);
+        const title = cleanTitle(text) || 'משימה ללא כותרת';
+        const nowISO = new Date().toISOString();
+
+        const docRef = await addDoc(collection(db, 'tasks'), {
           title,
           description: text,
           status: 'חדש',
           priority: 'בינונית',
           source_type: 'whatsapp',
-          sender_name: senderName,
+          sender_name: senderUser,
           sender_phone: senderPhone,
-          created_date: now,
-          createdAt: now,
-          assigned_to: '',
+          assigned_to: assignee,
+          created_date: nowISO,
+          createdAt: nowISO,
+          updated_date: nowISO,
         });
 
-        await sock.sendMessage(groupId, { text: `✅ משימה נוצרה: ${title}` });
-        console.log(`✅ משימה נוצרה: ${title}`);
+        // שמירת משימה פתוחה
+        openTasks[senderPhone] = {
+          taskId: docRef.id,
+          description: text,
+          lastMessageTime: now,
+        };
+
+        await sock.sendMessage(config.GROUP_ID, {
+          text: `✅ משימה נוצרה: ${title}\n👤 אחראי: ${assignee}\n📝 נוצר ע"י: ${senderUser}`
+        });
+        console.log(`✅ משימה: ${title} → ${assignee} (ע"י ${senderUser})`);
       } catch (err) {
-        console.error('❌ שגיאה ביצירת משימה:', err.message);
+        console.error('❌ שגיאה:', err.message);
       }
     }
   });
