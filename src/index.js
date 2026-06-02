@@ -9,9 +9,23 @@ const config = require('./config');
 const { initReminders } = require('./reminders');
 
 // אתחול Firebase Admin
-admin.initializeApp({
-  projectId: config.FIREBASE_PROJECT_ID,
-});
+// בשרת (Railway) משתמשים במפתח סודי שנשמר במשתנה סביבה FIREBASE_SERVICE_ACCOUNT
+// במחשב מקומי אפשר להריץ עם credentials ברירת מחדל
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // המפתח מגיע כטקסט JSON ממשתנה הסביבה
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    projectId: config.FIREBASE_PROJECT_ID,
+  });
+  console.log('🔑 Firebase מאותחל עם מפתח סודי (שרת)');
+} else {
+  // הרצה מקומית - credentials ברירת מחדל
+  admin.initializeApp({
+    projectId: config.FIREBASE_PROJECT_ID,
+  });
+  console.log('🔑 Firebase מאותחל עם הרשאות מקומיות');
+}
 const db = admin.firestore();
 
 // לוגר שקט - בלי הצפה של הודעות baileys
@@ -20,7 +34,9 @@ const logger = pino({ level: 'silent' });
 // התחברות לוואטסאפ
 async function connectToWhatsApp() {
   // טעינת מצב אימות שמור (או יצירת חדש)
-  const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
+  // בשרת אפשר להגדיר AUTH_DIR לכונן קבוע כדי לא לסרוק QR מחדש בכל פריסה
+  const authDir = process.env.AUTH_DIR || './auth_info';
+  const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
   const sock = makeWASocket({
     auth: state,
