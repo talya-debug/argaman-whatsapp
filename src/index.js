@@ -83,8 +83,8 @@ async function connectToWhatsApp() {
       isConnected = false;
       currentQR = '';
       if (shouldReconnect) {
-        console.log('🔄 מתחבר מחדש...');
-        connectToWhatsApp();
+        console.log('🔄 מתחבר מחדש בעוד 5 שניות...');
+        setTimeout(() => connectToWhatsApp(), 5000);
       }
     }
 
