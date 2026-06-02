@@ -50,7 +50,7 @@ http.createServer((req, res) => {
   } else {
     res.end('<html dir="rtl"><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial;background:#1a1d2e;color:#94a3b8;"><h2>ממתין ל-QR...<br><script>setTimeout(()=>location.reload(), 3000)</script></h2></body></html>');
   }
-}).listen(PORT, () => {
+}).listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 דף QR זמין בפורט ${PORT}`);
 });
 
