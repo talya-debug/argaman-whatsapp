@@ -31,13 +31,13 @@ let isConnected = false;
 // מעקב משימות פתוחות — { senderPhone: { taskId, lastMessageTime } }
 const openTasks = {};
 
-// מיפוי שם וואטסאפ ל-username
+// מיפוי שם וואטסאפ לשם בעברית
 function resolveUser(pushName) {
   if (!pushName) return null;
-  for (const [name, user] of Object.entries(config.NAME_TO_USER)) {
-    if (pushName.includes(name)) return user;
+  for (const [name, hebrewName] of Object.entries(config.NAME_TO_USER)) {
+    if (pushName.includes(name)) return hebrewName;
   }
-  return null;
+  return pushName; // אם לא נמצא — שם כמו שהוא בוואטסאפ
 }
 
 // חילוץ אחראי — מתיוג וואטסאפ (mentions) או מ-@שם בטקסט
