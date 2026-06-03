@@ -200,6 +200,7 @@ async function connectToWhatsApp() {
           priority: 'בינונית',
           source_type: 'whatsapp',
           sender_name: senderUser,
+          creator: senderUser,
           sender_phone: senderPhone,
           assigned_to: assignee,
           created_date: nowISO,
