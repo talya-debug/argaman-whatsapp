@@ -40,15 +40,36 @@ function resolveUser(pushName) {
   return null;
 }
 
-// חילוץ @אחראי מטקסט
-function extractAssignee(text) {
+// חילוץ אחראי — מתיוג וואטסאפ (mentions) או מ-@שם בטקסט
+function extractAssignee(text, msg) {
+  // קודם — בדיקת mentions מוואטסאפ (תיוגים אמיתיים)
+  const mentions = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+  if (mentions.length > 0) {
+    const mentionedPhone = mentions[0].replace('@s.whatsapp.net', '');
+    // חיפוש לפי מספר טלפון
+    if (config.PHONE_TO_USER[mentionedPhone]) {
+      return config.PHONE_TO_USER[mentionedPhone];
+    }
+    // חיפוש לפי pushName של המשתתף — נלוג כדי לבנות מיפוי
+    console.log(`📋 תיוג: ${mentionedPhone} — צריך להוסיף ל-PHONE_TO_USER`);
+  }
+
+  // אחר כך — בדיקת @שם בטקסט (ידני)
   const match = text.match(/@(\S+)/);
-  if (!match) return config.DEFAULT_ASSIGNEE;
-  const name = match[1];
-  return config.NAME_TO_USER[name] || config.DEFAULT_ASSIGNEE;
+  if (match) {
+    const name = match[1];
+    if (config.NAME_TO_USER[name]) return config.NAME_TO_USER[name];
+  }
+
+  // שם בגוף ההודעה (בלי @) — בדיקה אם מילה ראשונה אחרי "משימה" היא שם
+  const afterTask = text.replace(/^משימה\s*/i, '').trim();
+  const firstWord = afterTask.split(/\s/)[0];
+  if (config.NAME_TO_USER[firstWord]) return config.NAME_TO_USER[firstWord];
+
+  return config.DEFAULT_ASSIGNEE;
 }
 
-// הסרת @אחראי מטקסט
+// הסרת @אחראי ותיוגים מטקסט
 function cleanTitle(text) {
   return text.replace(/^משימה\s*/i, '').replace(/@\S+/g, '').trim();
 }
@@ -168,7 +189,7 @@ async function connectToWhatsApp() {
 
       // יצירת משימה חדשה
       try {
-        const assignee = extractAssignee(text);
+        const assignee = extractAssignee(text, msg);
         const title = cleanTitle(text) || 'משימה ללא כותרת';
         const nowISO = new Date().toISOString();
 
