@@ -26,7 +26,9 @@ module.exports = {
     'יהודה': 'yehuda',
   },
 
-  // מיפוי מספר טלפון (WhatsApp ID) → username
+  // מיפוי WhatsApp ID → username
   // הבוט ידפיס מספרים חדשים בלוג כדי להוסיף
-  PHONE_TO_USER: {},
+  PHONE_TO_USER: {
+    '201966693142782': 'yanir',   // יניר
+  },
 };

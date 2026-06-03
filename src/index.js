@@ -45,7 +45,7 @@ function extractAssignee(text, msg) {
   // קודם — בדיקת mentions מוואטסאפ (תיוגים אמיתיים)
   const mentions = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
   if (mentions.length > 0) {
-    const mentionedPhone = mentions[0].replace('@s.whatsapp.net', '');
+    const mentionedPhone = mentions[0].replace(/@.*/, '');
     // חיפוש לפי מספר טלפון
     if (config.PHONE_TO_USER[mentionedPhone]) {
       return config.PHONE_TO_USER[mentionedPhone];
