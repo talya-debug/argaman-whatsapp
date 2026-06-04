@@ -11,16 +11,26 @@ function initReminders(sock) {
 
   console.log('🕐 מפעיל תזכורות...');
 
-  // יומן עבודה — כל יום א-ה 18:00
+  // בדיקה שלא שישי/שבת (הגנה נוספת מעבר ל-cron)
+  const isWorkDay = () => {
+    const day = new Date().toLocaleDateString('en-US', { weekday: 'short', timeZone: config.TIMEZONE });
+    return !['Fri', 'Sat'].includes(day);
+  };
+
+  // יומן עבודה — א-ה 18:00 עם לינק
   cron.schedule(config.REMINDER_WORK_LOG_TIME, async () => {
+    if (!isWorkDay()) return;
     try {
-      await sock.sendMessage(config.GROUP_ID, { text: '📝 תזכורת: נא למלא יומן עבודה להיום' });
+      await sock.sendMessage(config.GROUP_ID, {
+        text: `📝 תזכורת: נא למלא יומן עבודה להיום\n\n🔗 למילוי: ${config.WORK_LOG_URL}`
+      });
       console.log('✅ תזכורת יומן עבודה');
     } catch (e) { console.error('❌ תזכורת יומן:', e.message); }
   }, { timezone: config.TIMEZONE });
 
-  // חשבונות — 1 לחודש
+  // חשבונות — 1 לחודש (אם נופל על שישי/שבת — לא שולח)
   cron.schedule(config.REMINDER_INVOICES_TIME, async () => {
+    if (!isWorkDay()) return;
     try {
       await sock.sendMessage(config.GROUP_ID, { text: '🧾 תזכורת חודשית: נא להגיש חשבונות' });
       console.log('✅ תזכורת חשבונות');
@@ -29,13 +39,14 @@ function initReminders(sock) {
 
   // רכבים — 1 לחודש
   cron.schedule(config.REMINDER_VEHICLES_TIME, async () => {
+    if (!isWorkDay()) return;
     try {
       await sock.sendMessage(config.GROUP_ID, { text: '🚗 תזכורת חודשית: נא לבדוק רכבים — טסט, ביטוח, דיווח ק"מ' });
       console.log('✅ תזכורת רכבים');
     } catch (e) { console.error('❌ תזכורת רכבים:', e.message); }
   }, { timezone: config.TIMEZONE });
 
-  console.log('✅ תזכורות הופעלו');
+  console.log('✅ תזכורות הופעלו (א-ה בלבד, לא שישי/שבת)');
 }
 
 module.exports = { initReminders };

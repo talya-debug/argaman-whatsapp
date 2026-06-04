@@ -5,10 +5,13 @@ module.exports = {
   FIREBASE_PROJECT_ID: 'argaman-f3921',
   TIMEZONE: 'Asia/Jerusalem',
 
-  // תזכורות
-  REMINDER_WORK_LOG_TIME: '0 18 * * 0-4',    // יומן עבודה — כל יום א-ה 18:00
+  // תזכורות — ימים 0-4 = ראשון עד חמישי (לא שישי ושבת!)
+  REMINDER_WORK_LOG_TIME: '0 18 * * 0-4',    // יומן עבודה — א-ה 18:00
   REMINDER_INVOICES_TIME: '0 9 1 * *',        // חשבונות — 1 לחודש 09:00
   REMINDER_VEHICLES_TIME: '0 9 1 * *',        // רכבים — 1 לחודש 09:00
+
+  // לינק למילוי יומן עבודה
+  WORK_LOG_URL: 'https://argaman-new.vercel.app/WorkLogForm',
 
   // זמן חלון משימה פתוחה (מילישניות) — 5 דקות
   TASK_WINDOW_MS: 5 * 60 * 1000,
