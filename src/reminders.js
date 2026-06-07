@@ -32,7 +32,7 @@ function initReminders(sock) {
   cron.schedule(config.REMINDER_INVOICES_TIME, async () => {
     if (!isWorkDay()) return;
     try {
-      await sock.sendMessage(config.GROUP_ID, { text: '🧾 תזכורת חודשית: נא להגיש חשבונות' });
+      await sock.sendMessage(config.GROUP_ID, { text: '🧾 תזכורת חודשית: נא להגיש חשבונות\n\n1. היכנסו לפרויקט → כתב כמויות\n2. עדכנו כמות שבוצעה\n3. לחצו "אשר חשבון והעבר לגבייה"' });
       console.log('✅ תזכורת חשבונות');
     } catch (e) { console.error('❌ תזכורת חשבונות:', e.message); }
   }, { timezone: config.TIMEZONE });
@@ -41,7 +41,7 @@ function initReminders(sock) {
   cron.schedule(config.REMINDER_VEHICLES_TIME, async () => {
     if (!isWorkDay()) return;
     try {
-      await sock.sendMessage(config.GROUP_ID, { text: '🚗 תזכורת חודשית: נא לבדוק רכבים — טסט, ביטוח, דיווח ק"מ' });
+      await sock.sendMessage(config.GROUP_ID, { text: '🚗 תזכורת חודשית: נא לבדוק רכבים — טסט, ביטוח, דיווח ק"מ\n\n🔗 דיווח ק"מ: https://argaman-new.vercel.app/KmReport' });
       console.log('✅ תזכורת רכבים');
     } catch (e) { console.error('❌ תזכורת רכבים:', e.message); }
   }, { timezone: config.TIMEZONE });
