@@ -21,9 +21,11 @@ function initReminders(sock) {
   cron.schedule(config.REMINDER_WORK_LOG_TIME, async () => {
     if (!isWorkDay()) return;
     try {
+      // הודעת טקסט קודם, ואז הלינק בהודעה נפרדת — כך וואטסאפ הופך אותו ללחיץ
       await sock.sendMessage(config.GROUP_ID, {
-        text: `📝 תזכורת: נא למלא יומן עבודה להיום\n\n🔗 למילוי: ${config.WORK_LOG_URL}`
+        text: '📝 תזכורת: נא למלא יומן עבודה להיום'
       });
+      await sock.sendMessage(config.GROUP_ID, { text: config.WORK_LOG_URL });
       console.log('✅ תזכורת יומן עבודה');
     } catch (e) { console.error('❌ תזכורת יומן:', e.message); }
   }, { timezone: config.TIMEZONE });
@@ -41,7 +43,8 @@ function initReminders(sock) {
   cron.schedule(config.REMINDER_VEHICLES_TIME, async () => {
     if (!isWorkDay()) return;
     try {
-      await sock.sendMessage(config.GROUP_ID, { text: '🚗 תזכורת חודשית: נא לבדוק רכבים — טסט, ביטוח, דיווח ק"מ\n\n🔗 דיווח ק"מ: https://argaman-new.vercel.app/KmReport' });
+      await sock.sendMessage(config.GROUP_ID, { text: '🚗 תזכורת חודשית: נא לבדוק רכבים — טסט, ביטוח, דיווח ק"מ' });
+      await sock.sendMessage(config.GROUP_ID, { text: 'https://argaman-new.vercel.app/KmReport' });
       console.log('✅ תזכורת רכבים');
     } catch (e) { console.error('❌ תזכורת רכבים:', e.message); }
   }, { timezone: config.TIMEZONE });

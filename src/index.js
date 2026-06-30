@@ -7,6 +7,7 @@ const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const http = require('http');
+const fs = require('fs');
 const config = require('./config');
 const { initReminders } = require('./reminders');
 
@@ -115,7 +116,13 @@ async function connectToWhatsApp() {
       console.log(`❌ חיבור נסגר. קוד: ${code}`);
       isConnected = false;
       currentQR = '';
-      if (code !== DisconnectReason.loggedOut) {
+      if (code === DisconnectReason.loggedOut) {
+        // וואטסאפ ניתק את הבוט (401) — מוחקים את האימות הישן
+        // ומתחילים מחדש כדי לייצר QR חדש לסריקה
+        console.log('🚪 התנתקות (401) — מוחק אימות ישן ומייצר QR חדש לסריקה...');
+        try { fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) {}
+        setTimeout(() => connectToWhatsApp(), 3000);
+      } else {
         console.log('🔄 מתחבר מחדש...');
         setTimeout(() => connectToWhatsApp(), 5000);
       }
