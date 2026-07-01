@@ -70,9 +70,15 @@ function extractAssignee(text, msg) {
   return config.DEFAULT_ASSIGNEE;
 }
 
-// הסרת @אחראי ותיוגים מטקסט
+// הסרת מילת "משימה", תיוגים, ושם האחראי מתחילת הכותרת
 function cleanTitle(text) {
-  return text.replace(/^משימה\s*/i, '').replace(/@\S+/g, '').trim();
+  let t = text.replace(/^משימה\s*/i, '').replace(/@\S+/g, '').trim();
+  // אם המילה הראשונה היא שם של אחראי — מסירים אותה מהכותרת
+  const firstWord = t.split(/\s/)[0];
+  if (config.NAME_TO_USER[firstWord]) {
+    t = t.slice(firstWord.length).trim();
+  }
+  return t;
 }
 
 // שרת HTTP להצגת QR
