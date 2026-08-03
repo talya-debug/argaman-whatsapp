@@ -30,7 +30,7 @@ let currentQR = '';
 let isConnected = false;
 // מונה כשלונות חיבור רצופים — אחרי כמה כשלונות מנקים auth פגום ומייצרים QR חדש
 let connectionFailures = 0;
-const MAX_FAILURES_BEFORE_RESET = 5;
+const MAX_FAILURES_BEFORE_RESET = 3;
 
 // מעקב משימות פתוחות — { senderPhone: { taskId, lastMessageTime } }
 const openTasks = {};
@@ -126,17 +126,15 @@ async function connectToWhatsApp() {
       isConnected = false;
       currentQR = '';
       connectionFailures++;
-      // 401 (logged out) — או יותר מדי כשלונות רצופים (למשל לולאת 405 עם auth פגום):
-      // מוחקים את האימות הישן ומתחילים מחדש כדי לייצר QR חדש לסריקה
-      if (code === DisconnectReason.loggedOut || connectionFailures >= MAX_FAILURES_BEFORE_RESET) {
-        console.log(`🧹 מנקה אימות פגום (קוד ${code}, ${connectionFailures} כשלונות) ומייצר QR חדש לסריקה...`);
+      // ניקוי חד-פעמי של auth פגום בכשלון השלישי — כדי לייצר QR חדש בלי לנקות בלולאה מהירה
+      if (connectionFailures === MAX_FAILURES_BEFORE_RESET) {
+        console.log('🧹 מנקה אימות פגום ומנסה לייצר QR חדש לסריקה...');
         try { fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) {}
-        connectionFailures = 0;
-        setTimeout(() => connectToWhatsApp(), 3000);
-      } else {
-        console.log(`🔄 מתחבר מחדש... (ניסיון ${connectionFailures})`);
-        setTimeout(() => connectToWhatsApp(), 5000);
       }
+      // השהיה הולכת וגדלה (backoff) — כדי לא להציף את וואטסאפ ולגרום לחסימה
+      const delay = Math.min(60000, 8000 * connectionFailures);
+      console.log(`🔄 מתחבר מחדש בעוד ${Math.round(delay / 1000)}ש (כשלון ${connectionFailures}, קוד ${code})`);
+      setTimeout(() => connectToWhatsApp(), delay);
     }
     if (connection === 'open') {
       connectionFailures = 0; // חיבור הצליח — איפוס מונה הכשלונות
