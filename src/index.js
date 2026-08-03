@@ -28,6 +28,9 @@ const logger = pino({ level: 'silent' });
 // מצב חיבור
 let currentQR = '';
 let isConnected = false;
+// מונה כשלונות חיבור רצופים — אחרי כמה כשלונות מנקים auth פגום ומייצרים QR חדש
+let connectionFailures = 0;
+const MAX_FAILURES_BEFORE_RESET = 5;
 
 // מעקב משימות פתוחות — { senderPhone: { taskId, lastMessageTime } }
 const openTasks = {};
@@ -122,18 +125,21 @@ async function connectToWhatsApp() {
       console.log(`❌ חיבור נסגר. קוד: ${code}`);
       isConnected = false;
       currentQR = '';
-      if (code === DisconnectReason.loggedOut) {
-        // וואטסאפ ניתק את הבוט (401) — מוחקים את האימות הישן
-        // ומתחילים מחדש כדי לייצר QR חדש לסריקה
-        console.log('🚪 התנתקות (401) — מוחק אימות ישן ומייצר QR חדש לסריקה...');
+      connectionFailures++;
+      // 401 (logged out) — או יותר מדי כשלונות רצופים (למשל לולאת 405 עם auth פגום):
+      // מוחקים את האימות הישן ומתחילים מחדש כדי לייצר QR חדש לסריקה
+      if (code === DisconnectReason.loggedOut || connectionFailures >= MAX_FAILURES_BEFORE_RESET) {
+        console.log(`🧹 מנקה אימות פגום (קוד ${code}, ${connectionFailures} כשלונות) ומייצר QR חדש לסריקה...`);
         try { fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) {}
+        connectionFailures = 0;
         setTimeout(() => connectToWhatsApp(), 3000);
       } else {
-        console.log('🔄 מתחבר מחדש...');
+        console.log(`🔄 מתחבר מחדש... (ניסיון ${connectionFailures})`);
         setTimeout(() => connectToWhatsApp(), 5000);
       }
     }
     if (connection === 'open') {
+      connectionFailures = 0; // חיבור הצליח — איפוס מונה הכשלונות
       console.log('✅ מחובר לוואטסאפ');
       isConnected = true;
       currentQR = '';
