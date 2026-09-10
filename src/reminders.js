@@ -30,6 +30,12 @@ function initReminders(sender) {
   // אם הוגדרו נמענים (WORK_LOG_RECIPIENTS) — נשלח בפרטי לכל עובד. אחרת — לקבוצה.
   cron.schedule(config.REMINDER_WORK_LOG_TIME, async () => {
     if (!isWorkDay()) return;
+    // מתג הפעלה — כבוי כברירת מחדל. הבוט לא ישלח תזכורות יומן עבודה
+    // עד שיוגדר במפורש WORKLOG_REMINDERS=on במשתני הסביבה (אישור טליה).
+    if (process.env.WORKLOG_REMINDERS !== 'on') {
+      console.log('⏸️ תזכורת יומן עבודה כבויה (WORKLOG_REMINDERS≠on) — לא נשלח');
+      return;
+    }
     try {
       const recipients = config.WORK_LOG_RECIPIENTS || [];
       if (recipients.length) {
