@@ -97,7 +97,8 @@ async function handleWebhook(body) {
   const senderUser = resolveUser(senderName) || senderName;
 
   const md = body.messageData || {};
-  const text = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || '';
+  // טקסט מגיע מהודעת טקסט, או מהכיתוב (caption) כשההודעה כוללת קובץ/תמונה/PDF
+  const text = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || md.fileMessageData?.caption || '';
 
   const tp = md.typeMessage || '';
   const mediaType = tp === 'imageMessage' ? 'תמונה'
@@ -136,9 +137,14 @@ async function handleWebhook(body) {
     const title = cleanTitle(text) || 'משימה ללא כותרת';
     const nowISO = new Date().toISOString();
 
+    // אם צורף קובץ/תמונה/PDF — מוסיפים ציון ולינק להורדה בתיאור
+    const fileUrl = md.fileMessageData?.downloadUrl || '';
+    const fileNote = mediaType ? `\n📎 ${mediaType}${fileUrl ? `: ${fileUrl}` : ''}` : '';
+    const description = text + fileNote;
+
     const docRef = await addDoc(collection(db, 'tasks'), {
       title,
-      description: text,
+      description,
       status: 'חדש',
       priority: 'בינונית',
       source_type: 'whatsapp',
@@ -151,7 +157,7 @@ async function handleWebhook(body) {
       updated_date: nowISO,
     });
 
-    openTasks[senderId] = { taskId: docRef.id, description: text, lastMessageTime: now };
+    openTasks[senderId] = { taskId: docRef.id, description, lastMessageTime: now };
 
     await sendToGroup(`✅ משימה נוצרה: ${title}\n👤 אחראי: ${assignee}\n📝 נוצר ע"י: ${senderUser}`);
     console.log(`✅ משימה: ${title} → ${assignee} (ע"י ${senderUser})`);
