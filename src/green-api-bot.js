@@ -98,7 +98,10 @@ async function handleWebhook(body) {
 
   const md = body.messageData || {};
   // טקסט מגיע מהודעת טקסט, או מהכיתוב (caption) כשההודעה כוללת קובץ/תמונה/PDF
-  const text = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || md.fileMessageData?.caption || '';
+  const rawText = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || md.fileMessageData?.caption || '';
+  // הסרת תווי כיוון/בקרה נסתרים (RTL/LRM mark, isolates, BOM) שוואטסאפ מוסיף לפעמים
+  // בתחילת טקסט בעברית — הם חוסמים את זיהוי "משימה" בתחילת ההודעה.
+  const text = rawText.replace(/[‎‏‪-‮⁦-⁩﻿￼]/g, '').trim();
 
   const tp = md.typeMessage || '';
   const mediaType = tp === 'imageMessage' ? 'תמונה'
